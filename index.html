@@ -434,6 +434,7 @@
 
   // ---------- 启动 ----------
   resize();
+  rebuildCount();              // 初始化粒子，否则 P 为空、首屏没有蝴蝶
   seedEl.textContent=seed;
   countEl.textContent=Math.round(N).toLocaleString();
   requestAnimationFrame(frame);
