@@ -3,202 +3,397 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>电子蝴蝶 · EPHEMERAL BUTTERFLY</title>
+<title>电子蝴蝶 · 流场蜕变</title>
 <style>
   :root{
     --bg:#05060a;
-    --cyan:#38f9ff;
-    --magenta:#ff3df0;
-    --green:#5dff9e;
     --ink:#cfd8ff;
+    --panel:rgba(16,18,28,0.66);
+    --line:rgba(207,216,255,0.14);
   }
   *{margin:0;padding:0;box-sizing:border-box;}
   html,body{height:100%;overflow:hidden;background:var(--bg);}
-  body{font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;color:var(--ink);cursor:crosshair;}
-  canvas{position:fixed;inset:0;display:block;}
-  .title{position:fixed;left:50%;top:6vh;transform:translateX(-50%);text-align:center;pointer-events:none;mix-blend-mode:screen;}
-  .title h1{font-size:clamp(15px,2.4vw,26px);font-weight:600;letter-spacing:.42em;color:#eaf2ff;text-shadow:0 0 12px rgba(56,249,255,.55);}
-  .title .sub{margin-top:6px;font-size:10px;letter-spacing:.45em;color:rgba(207,216,255,.4);}
-  .hint{position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);font-size:12px;letter-spacing:.22em;color:rgba(207,216,255,.55);pointer-events:none;transition:opacity 1.2s ease;text-align:center;}
-  .hint.hide{opacity:0;}
-  .hint .k{color:var(--cyan);}
-  .vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);}
+  body{font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;color:var(--ink);}
+  #stage{position:fixed;inset:0;background:var(--bg);}
+  canvas{display:block;width:100%;height:100%;}
+  .vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.58) 100%);}
+  /* 顶部控制区 */
+  .topbar{
+    position:fixed;left:0;right:0;top:0;z-index:20;
+    padding:12px 16px 10px;
+    background:linear-gradient(180deg,rgba(5,6,10,0.92),rgba(5,6,10,0));
+    backdrop-filter:blur(6px);
+  }
+  .row1{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .title{
+    font-weight:800;letter-spacing:.04em;font-size:15px;
+    background:var(--panel);border:1px solid var(--line);
+    padding:9px 14px;border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,.4);
+    white-space:nowrap;
+  }
+  .title b{background:linear-gradient(90deg,#38f9ff,#ff3df0,#5dff9e);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .panel{
+    background:var(--panel);border:1px solid var(--line);
+    padding:9px 14px;border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,.4);
+    font-size:13px;font-variant-numeric:tabular-nums;display:flex;gap:16px;align-items:center;
+  }
+  .stat{display:flex;flex-direction:column;line-height:1.15;}
+  .stat .k{font-size:10px;opacity:.55;letter-spacing:.08em;text-transform:uppercase;}
+  .stat .v{font-weight:700;font-size:14px;}
+  .btns{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;}
+  button{
+    font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;
+    border:1px solid var(--line);border-radius:13px;padding:11px 16px;
+    background:var(--panel);color:var(--ink);box-shadow:0 6px 22px rgba(0,0,0,.4);
+    transition:transform .12s ease,box-shadow .12s ease;
+  }
+  button:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(0,0,0,.55);}
+  button:active{transform:translateY(0);}
+  #regen{background:linear-gradient(135deg,#ff3df0,#38f9ff);color:#06121a;border-color:transparent;}
+  #demo{background:linear-gradient(135deg,#5dff9e,#38f9ff);color:#06121a;border-color:transparent;}
+  #save{background:linear-gradient(135deg,#38f9ff,#ff3df0);color:#06121a;border-color:transparent;}
+  /* 滑块组 */
+  .controls{
+    display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;
+    background:var(--panel);border:1px solid var(--line);
+    padding:12px 16px;border-radius:16px;box-shadow:0 6px 22px rgba(0,0,0,.4);
+  }
+  .ctrl{display:flex;flex-direction:column;gap:5px;min-width:148px;flex:1 1 148px;}
+  .ctrl .lab{display:flex;justify-content:space-between;font-size:12px;align-items:baseline;}
+  .ctrl .lab .name{font-weight:700;opacity:.85;}
+  .ctrl .lab .val{font-variant-numeric:tabular-nums;font-weight:700;color:#38f9ff;}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:4px;
+    background:linear-gradient(90deg,#38f9ff,#ff3df0,#5dff9e);outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:2px solid #0a0c14;box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #0a0c14;cursor:pointer;
+  }
+  .hint{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:10;
+    font-size:11px;opacity:.5;pointer-events:none;text-align:center;letter-spacing:.05em;}
 </style>
 </head>
 <body>
-  <canvas id="c"></canvas>
+  <div id="stage"><canvas id="c"></canvas></div>
   <div class="vignette"></div>
-  <div class="title">
-    <h1>电子蝴蝶</h1>
-    <div class="sub">EPHEMERAL · BUTTERFLY · METAMORPHOSIS</div>
+
+  <div class="topbar">
+    <div class="row1">
+      <div class="title">🦋 <b>电子蝴蝶 · 流场蜕变</b></div>
+      <div class="panel">
+        <div class="stat"><span class="k">Seed</span><span class="v" id="seed">—</span></div>
+        <div class="stat"><span class="k">粒子数</span><span class="v" id="count">—</span></div>
+        <div class="stat"><span class="k">FPS</span><span class="v" id="fps">—</span></div>
+      </div>
+      <div class="btns">
+        <button id="regen">🎲 重新生成</button>
+        <button id="demo">✨ 随机演示</button>
+        <button id="save">💾 保存 PNG</button>
+      </div>
+    </div>
+    <div class="controls" id="controls"></div>
   </div>
-  <div class="hint" id="hint">移动光标 · <span class="k">点击</span> 触发蜕变：化茧 → 破茧 → 离子消散</div>
+
+  <div class="hint">点击画面触发蜕变：化茧 → 破茧成蝶 → 离子消散 · 拖动滑块实时调参</div>
 
 <script>
 (() => {
+  "use strict";
   const cv = document.getElementById('c');
-  const ctx = cv.getContext('2d');
-  const hint = document.getElementById('hint');
+  const ctx = cv.getContext('2d', {alpha:false});
+  const seedEl = document.getElementById('seed');
+  const countEl = document.getElementById('count');
+  const fpsEl = document.getElementById('fps');
+  const controlsEl = document.getElementById('controls');
 
-  let W = 0, H = 0, DPR = 1;
-  function resize(){
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
-    cv.width = W * DPR; cv.height = H * DPR;
-    cv.style.width = W + 'px'; cv.style.height = H + 'px';
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // ---------- 种子化 Perlin 噪声（驱动流场）----------
+  function makePerlin(seed){
+    const perm = new Uint8Array(512); const p = [];
+    for(let i=0;i<256;i++) p[i]=i;
+    let s=(seed>>>0)||1; const rnd=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+    for(let i=255;i>0;i--){const j=(rnd()*(i+1))|0;const t=p[i];p[i]=p[j];p[j]=t;}
+    for(let i=0;i<512;i++) perm[i]=p[i&255];
+    const fade=t=>t*t*t*(t*(t*6-15)+10);
+    const lerp=(a,b,t)=>a+t*(b-a);
+    const grad=(h,x,y,z)=>{const g=h&15;const u=g<8?x:y;const v=g<4?y:(g===12||g===14?x:z);
+      return ((g&1)===0?u:-u)+((g&2)===0?v:-v);};
+    return (x,y,z)=>{
+      const X=Math.floor(x)&255,Y=Math.floor(y)&255,Z=Math.floor(z)&255;
+      x-=Math.floor(x);y-=Math.floor(y);z-=Math.floor(z);
+      const u=fade(x),v=fade(y),w=fade(z);
+      const A=perm[X]+Y,AA=perm[A]+Z,AB=perm[A+1]+Z;
+      const B=perm[X+1]+Y,BA=perm[B]+Z,BB=perm[B+1]+Z;
+      return lerp(
+        lerp(lerp(grad(perm[AA],x,y,z),grad(perm[BA],x-1,y,z),u),
+             lerp(grad(perm[AB],x,y-1,z),grad(perm[BB],x-1,y-1,z),u),v),
+        lerp(lerp(grad(perm[AA+1],x,y,z-1),grad(perm[BA+1],x-1,y,z-1),u),
+             lerp(grad(perm[AB+1],x,y-1,z-1),grad(perm[BB+1],x-1,y-1,z-1),u),v),w);
+    };
   }
-  window.addEventListener('resize', resize); resize();
 
-  // 鼠标 / 触摸
-  const mouse = { x: W/2, y: H/2, has: false };
-  function setMouse(x, y){ mouse.x = x; mouse.y = y; mouse.has = true; hideHint(); }
-  window.addEventListener('mousemove', e => setMouse(e.clientX, e.clientY));
-  window.addEventListener('touchmove', e => { const t=e.touches[0]; if(t) setMouse(t.clientX,t.clientY); }, {passive:true});
-  let hintHidden = false;
-  function hideHint(){ if(!hintHidden){ hintHidden = true; hint.classList.add('hide'); } }
-  setTimeout(hideHint, 6000);
+  // 由 Seed 旋转色相 → 颜色随种子变化（对应"颜色"类参数）
+  function makePalette(seed){
+    const base=[186,312,148,205,0]; // 青 / 品红 / 绿 / 浅蓝 / 白
+    const off=((seed%360)+360)%360; const out=[];
+    for(let i=0;i<base.length;i++){
+      if(i===4){ out.push('#ffffff'); continue; }
+      out.push('hsl('+((base[i]+off)%360)+',100%,66%)');
+    }
+    return out;
+  }
 
-  const PAL = ['#38f9ff', '#ff3df0', '#5dff9e', '#bfe9ff', '#ffffff'];
+  let seed = (Math.random()*1e9)|0;
+  let perlin = makePerlin(seed);
+  let PAL = makePalette(seed);
 
-  // 预渲染辉光精灵：一次性离屏画好，循环里用 drawImage 贴图（替代昂贵的 shadowBlur）
-  const sprites = {};
+  // 预渲染辉光精灵（替代昂贵的 shadowBlur）
+  let sprites = {};
   function makeSprite(color){
-    const s = 64, c = document.createElement('canvas'); c.width = c.height = s;
-    const g = c.getContext('2d');
-    const grd = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
-    grd.addColorStop(0, color);
-    grd.addColorStop(0.22, color);
-    grd.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = grd; g.fillRect(0, 0, s, s);
-    return c;
+    const s=64, c=document.createElement('canvas'); c.width=c.height=s;
+    const g=c.getContext('2d');
+    const grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+    grd.addColorStop(0,color); grd.addColorStop(0.22,color); grd.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=grd; g.fillRect(0,0,s,s); return c;
   }
-  for(const col of PAL) sprites[col] = makeSprite(col);
+  function rebuildSprites(){ sprites={}; for(const col of PAL) sprites[col]=makeSprite(col); }
+  rebuildSprites();
 
-  // 蝴蝶曲线基准点 (Fay's butterfly)
+  // ---------- 可调参数（由滑块驱动）----------
+  const state = { count:6000, noise:0.0012, time:0.0006, turns:2.0, speed:1.2, trail:0.06 };
+  const CELL = 18;
+  let DPR = Math.min(window.devicePixelRatio||1, 1.5);
+  let W=0,H=0,cols=0,rows=0, field=null, zoff=0;
+
+  // ---------- 蝴蝶曲线基准点 (Fay) ----------
   function makeButterfly(n){
-    const pts = [];
+    const pts=[];
     for(let i=0;i<n;i++){
-      const t = (i/n) * 12 * Math.PI;
-      const e = Math.exp(Math.cos(t)) - 2*Math.cos(4*t) - Math.pow(Math.sin(t/12), 5);
-      pts.push({ x: Math.sin(t) * e / 4.2, y: -Math.cos(t) * e / 4.2 });
+      const t=(i/n)*12*Math.PI;
+      const e=Math.exp(Math.cos(t))-2*Math.cos(4*t)-Math.pow(Math.sin(t/12),5);
+      pts.push({ x:Math.sin(t)*e/4.2, y:-Math.cos(t)*e/4.2 });
     }
     return pts;
   }
-  const N = 560;
-  const base = makeButterfly(N);
 
-  const P = [];
-  const rnd = (a,b) => a + Math.random()*(b-a);
-  for(let i=0;i<N;i++){
-    P.push({
-      x: rnd(0,W), y: rnd(0,H),
-      vx: 0, vy: 0, tx: 0, ty: 0,
-      a: rnd(.5,1), aT: 1,
-      size: rnd(1.1, 2.6),
-      col: PAL[(Math.random()*PAL.length)|0],
-      flick: Math.random()*Math.PI*2
-    });
+  let N = state.count;
+  let base = makeButterfly(N);
+  let P = [];
+  const cx = {x:0,y:0};
+  let scale = 1;
+
+  function makeParticles(n){
+    const arr=[];
+    for(let i=0;i<n;i++){
+      arr.push({
+        x:Math.random()*W, y:Math.random()*H,
+        vx:0, vy:0, tx:0, ty:0,
+        a:Math.random()*0.6, aT:1,
+        size:1.1+Math.random()*1.5,
+        ci:(Math.random()*PAL.length)|0,
+        flick:Math.random()*Math.PI*2
+      });
+    }
+    return arr;
+  }
+  function rebuildCount(){
+    N = state.count|0; base = makeButterfly(N); P = makeParticles(N);
+    countEl.textContent = Math.round(N).toLocaleString();
+    if(stateName==='cocoon') assignCocoon();
   }
 
-  const cx = { x: W/2, y: H/2 };
-  let scale = Math.min(W,H) * 0.16;
-  let state = 'butterfly', stateStart = performance.now(), lastInteract = performance.now();
-  let flapPhase = 0, emergePop = 1;
-  const T = { cocoon: 1500, emerge: 1100, dissipate: 1700 };
-  let cocoonC = {x:0,y:0}, cocoonTargets = null;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 1.5);
+    W = Math.floor(window.innerWidth*DPR); H = Math.floor(window.innerHeight*DPR);
+    cv.width = W; cv.height = H;
+    cols = Math.ceil(W/CELL)+1; rows = Math.ceil(H/CELL)+1;
+    field = new Float32Array(cols*rows);
+    cx.x = W/2; cx.y = H/2; scale = Math.min(W,H)*0.16;
+    ctx.fillStyle = '#05060a'; ctx.fillRect(0,0,W,H);
+    if(stateName==='cocoon') assignCocoon();
+  }
+
+  function rebuildField(){
+    const NS=state.noise, T=state.turns;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const n=perlin(c*CELL*NS, r*CELL*NS, zoff);
+        field[r*cols+c]=n*Math.PI*2*T;
+      }
+    }
+  }
+
+  // ---------- 蜕变状态机 ----------
+  let stateName='butterfly', stateStart=performance.now(), lastInteract=performance.now();
+  let flapPhase=0, emergePop=1;
+  const T={ cocoon:1500, emerge:1100, dissipate:1700 };
+  let cocoonC={x:0,y:0}, cocoonTargets=null;
 
   function assignCocoon(){
-    cocoonC.x = cx.x; cocoonC.y = cx.y;
-    const w = scale*0.5, h = scale*1.5;
-    cocoonTargets = [];
+    cocoonC.x=cx.x; cocoonC.y=cx.y;
+    const w=scale*0.5, h=scale*1.5; cocoonTargets=[];
     for(let i=0;i<N;i++){
-      const ang = Math.random()*Math.PI*2, r = Math.sqrt(Math.random());
-      const taper = 1 - 0.45*Math.abs(Math.sin(Math.random()*Math.PI));
-      cocoonTargets.push({ x: cocoonC.x + Math.cos(ang)*w*r*taper, y: cocoonC.y + Math.sin(ang)*h*r });
+      const ang=Math.random()*Math.PI*2, r=Math.sqrt(Math.random());
+      const taper=1-0.45*Math.abs(Math.sin(Math.random()*Math.PI));
+      cocoonTargets.push({ x:cocoonC.x+Math.cos(ang)*w*r*taper, y:cocoonC.y+Math.sin(ang)*h*r });
     }
   }
-
   function triggerMetamorphosis(){
-    if(state !== 'butterfly') return;
-    state = 'cocoon'; stateStart = performance.now(); lastInteract = performance.now();
+    if(stateName!=='butterfly') return;
+    stateName='cocoon'; stateStart=performance.now(); lastInteract=performance.now();
     assignCocoon();
-    for(const p of P){ p.vx = 0; p.vy = 0; p.aT = 1; }
+    for(const p of P){ p.vx=0; p.vy=0; p.aT=1; }
   }
-  window.addEventListener('click', triggerMetamorphosis);
-  window.addEventListener('touchstart', () => triggerMetamorphosis(), {passive:true});
+  cv.addEventListener('click', triggerMetamorphosis);
+  cv.addEventListener('touchstart', ()=>triggerMetamorphosis(), {passive:true});
 
-  let last = performance.now();
+  // ---------- 渲染循环 ----------
+  let last=performance.now(), fpsFrames=0, fpsTimer=0;
   function frame(now){
-    const dt = Math.min(40, now - last); last = now;
-    const time = now/1000;
-
-    const sd = now - stateStart;
-    if(state === 'cocoon' && sd > T.cocoon){
-      state = 'emerge'; stateStart = now; emergePop = 1.6;
-      for(const p of P){ p.aT = 1; p.size = rnd(1.3,3.0); }
-    } else if(state === 'emerge' && sd > T.emerge){
-      state = 'dissipate'; stateStart = now;
-      for(const p of P){
-        const ang = Math.atan2(p.y - cx.y, p.x - cx.x) + rnd(-.5,.5);
-        const sp = rnd(1.2, 4.5) * (scale/120);
-        p.vx = Math.cos(ang)*sp + rnd(-.4,.4);
-        p.vy = Math.sin(ang)*sp - rnd(.6,1.8);
-        p.aT = 0;
-      }
-    } else if(state === 'dissipate'){
-      let sum = 0; for(const p of P) sum += p.a;
-      if(sum/N < 0.06){ state = 'butterfly'; stateStart = now; emergePop = 1.3;
-        for(const p of P){ p.x = cx.x + rnd(-20,20); p.y = cx.y + rnd(-20,20); p.vx = 0; p.vy = 0; p.a = 0; p.aT = 1; }
-      }
-    }
-    if(state === 'butterfly' && now - lastInteract > 9000 && now - stateStart > 3500) triggerMetamorphosis();
-
-    // 全屏跟随光标
-    const minX = scale*1.3, maxX = W - scale*1.3, minY = H*0.14, maxY = H*0.9;
-    let targetX = mouse.has ? mouse.x : cx.x + Math.sin(time*0.6)*40;
-    let targetY = mouse.has ? mouse.y : H/2 + Math.cos(time*0.5)*30;
-    targetX = Math.max(minX, Math.min(maxX, targetX));
-    targetY = Math.max(minY, Math.min(maxY, targetY));
-    if(state !== 'dissipate' && state !== 'reform'){ cx.x += (targetX - cx.x) * 0.06; cx.y += (targetY - cx.y) * 0.06; }
-
-    flapPhase += dt * 0.012;
-    const flap = 0.55 + 0.45*Math.sin(flapPhase*6);
-    emergePop += (1 - emergePop) * 0.08;
-    const curScale = scale * emergePop;
+    const dt=Math.min(40, now-last); last=now;
+    fpsFrames++; fpsTimer+=dt;
+    if(fpsTimer>=500){ fpsEl.textContent=Math.round(fpsFrames/(fpsTimer/1000)); fpsFrames=0; fpsTimer=0; }
 
     // 拖尾
-    ctx.fillStyle = 'rgba(5,6,10,0.22)';
-    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(5,6,10,'+state.trail+')'; ctx.fillRect(0,0,W,H);
 
-    ctx.globalCompositeOperation = 'lighter';
-    for(let i=0;i<N;i++){
-      const p = P[i];
-      if(state === 'butterfly' || state === 'emerge'){
-        const b = base[i], fx = state === 'emerge' ? b.x : b.x * flap;
-        p.tx = cx.x + fx * curScale; p.ty = cx.y + b.y * curScale;
-        p.x += (p.tx - p.x) * 0.18; p.y += (p.ty - p.y) * 0.18;
-      } else if(state === 'cocoon'){
-        const c = cocoonTargets[i], pulse = 1 + 0.05*Math.sin(time*5 + i);
-        p.tx = c.x; p.ty = c.y + (c.y - cocoonC.y) * (pulse - 1);
-        p.x += (p.tx - p.x) * 0.16; p.y += (p.ty - p.y) * 0.16;
-      } else if(state === 'dissipate'){
-        p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.vx *= 0.985; p.vy *= 0.99;
+    zoff += state.time*(dt||16);
+    rebuildField();
+
+    const sd=now-stateStart;
+    if(stateName==='cocoon' && sd>T.cocoon){
+      stateName='emerge'; stateStart=now; emergePop=1.6;
+      for(const p of P){ p.aT=1; p.size=1.3+Math.random()*1.7; }
+    } else if(stateName==='emerge' && sd>T.emerge){
+      stateName='dissipate'; stateStart=now;
+      for(const p of P){
+        const ang=Math.atan2(p.y-cx.y, p.x-cx.x)+ (Math.random()-0.5);
+        const sp=(1.2+Math.random()*3.3)*(scale/120);
+        p.vx=Math.cos(ang)*sp; p.vy=Math.sin(ang)*sp - 0.6; p.aT=0;
       }
-      p.a += (p.aT - p.a) * 0.06; p.flick += 0.2;
-      const tw = 0.75 + 0.25*Math.sin(p.flick);
-      let alpha = p.a * tw; if(state === 'dissipate') alpha *= Math.max(0, p.a);
-      const sz = p.size * (state === 'dissipate' ? (1 + (1-p.a)*1.4) : 1) * 4;
-      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.drawImage(sprites[p.col], p.x - sz, p.y - sz, sz*2, sz*2);
+    } else if(stateName==='dissipate'){
+      let sum=0; for(const p of P) sum+=p.a;
+      if(sum/N<0.06){ stateName='butterfly'; stateStart=now; emergePop=1.3; lastInteract=now;
+        for(const p of P){ p.x=cx.x+(Math.random()-0.5)*40; p.y=cx.y+(Math.random()-0.5)*40; p.vx=0; p.vy=0; p.a=0; p.aT=1; }
+      }
     }
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
+    if(stateName==='butterfly' && now-lastInteract>9000 && now-stateStart>3500) triggerMetamorphosis();
 
+    // 每阶段：弹簧锚点强度 + 流场混合
+    let springK, flowMix;
+    if(stateName==='cocoon'){ springK=0.16; flowMix=0; }
+    else if(stateName==='dissipate'){ springK=0; flowMix=1.8; }
+    else { springK=0.14; flowMix=0.85; }
+
+    flapPhase += dt*0.012;
+    const flap=0.55+0.45*Math.sin(flapPhase*6);
+    emergePop += (1-emergePop)*0.08;
+    const curScale=scale*emergePop;
+    const flowDisp=state.speed*DPR*0.9*flowMix;
+
+    ctx.globalCompositeOperation='lighter';
+    for(let i=0;i<N;i++){
+      const p=P[i];
+      if(stateName==='butterfly'||stateName==='emerge'){
+        const b=base[i], fx=stateName==='emerge'?b.x:b.x*flap;
+        p.tx=cx.x+fx*curScale; p.ty=cx.y+b.y*curScale;
+      } else if(stateName==='cocoon'){
+        const c=cocoonTargets[i], pulse=1+0.05*Math.sin(now/1000*5+i);
+        p.tx=c.x; p.ty=c.y+(c.y-cocoonC.y)*(pulse-1);
+      }
+      let fxv=0, fyv=0;
+      if(flowMix>0){
+        const c=(p.x/CELL)|0, r=(p.y/CELL)|0;
+        const ci=Math.min(rows-1,Math.max(0,r))*cols+Math.min(cols-1,Math.max(0,c));
+        const ang=field[ci]; fxv=Math.cos(ang)*flowDisp; fyv=Math.sin(ang)*flowDisp;
+      }
+      if(stateName!=='dissipate'){
+        p.x += (p.tx-p.x)*springK + fxv;
+        p.y += (p.ty-p.y)*springK + fyv;
+      } else {
+        p.x += p.vx + fxv*0.3; p.y += p.vy + fyv*0.3; p.vy += 0.02; p.vx*=0.99; p.vy*=0.99;
+      }
+      p.a += (p.aT-p.a)*0.06; p.flick+=0.2;
+      const tw=0.78+0.22*Math.sin(p.flick);
+      let alpha=p.a*tw; if(stateName==='dissipate') alpha*=Math.max(0,p.a);
+      const sz=p.size*(stateName==='dissipate'?(1+(1-p.a)*1.4):1)*4;
+      ctx.globalAlpha=Math.max(0,Math.min(1,alpha));
+      ctx.drawImage(sprites[PAL[p.ci]], p.x-sz, p.y-sz, sz*2, sz*2);
+    }
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
     requestAnimationFrame(frame);
   }
+
+  // ---------- 控件 ----------
+  const CONF=[
+    {key:'count',name:'粒子数',min:1000,max:12000,step:500,fmt:v=>Math.round(v).toLocaleString()},
+    {key:'noise',name:'噪声频率',min:0.0004,max:0.004,step:0.0001,fmt:v=>v.toFixed(4)},
+    {key:'time', name:'演化速度',min:0.0001,max:0.002,step:0.0001,fmt:v=>v.toFixed(4)},
+    {key:'turns',name:'旋涡圈数',min:0.5,max:4,step:0.1,fmt:v=>v.toFixed(1)},
+    {key:'speed',name:'粒子速度',min:0.5,max:4,step:0.1,fmt:v=>v.toFixed(1)},
+    {key:'trail',name:'拖尾衰减',min:0.02,max:0.15,step:0.005,fmt:v=>v.toFixed(3)},
+  ];
+  const valSpans={};
+  CONF.forEach(cfg=>{
+    const wrap=document.createElement('div'); wrap.className='ctrl';
+    const lab=document.createElement('div'); lab.className='lab';
+    const nm=document.createElement('span'); nm.className='name'; nm.textContent=cfg.name;
+    const vv=document.createElement('span'); vv.className='val'; vv.textContent=cfg.fmt(state[cfg.key]);
+    lab.appendChild(nm); lab.appendChild(vv);
+    const inp=document.createElement('input');
+    inp.type='range'; inp.min=cfg.min; inp.max=cfg.max; inp.step=cfg.step; inp.value=state[cfg.key];
+    inp.addEventListener('input',()=>{
+      const v=parseFloat(inp.value); state[cfg.key]=v; vv.textContent=cfg.fmt(v);
+      if(cfg.key==='count'){ rebuildCount(); }
+    });
+    valSpans[cfg.key]=vv;
+    wrap.appendChild(lab); wrap.appendChild(inp);
+    controlsEl.appendChild(wrap);
+  });
+  function syncControls(){
+    [...controlsEl.querySelectorAll('input')].forEach((inp,idx)=>{
+      const cfg=CONF[idx]; inp.value=state[cfg.key]; valSpans[cfg.key].textContent=cfg.fmt(state[cfg.key]);
+    });
+    countEl.textContent=Math.round(state.count).toLocaleString();
+  }
+
+  function regenerate(){
+    seed=(Math.random()*1e9)|0; perlin=makePerlin(seed); PAL=makePalette(seed); rebuildSprites();
+    seedEl.textContent=seed;
+    ctx.fillStyle='#05060a'; ctx.fillRect(0,0,W,H);
+  }
+  function randomDemo(){
+    regenerate();
+    CONF.forEach(cfg=>{
+      const steps=Math.round((cfg.max-cfg.min)/cfg.step);
+      state[cfg.key]=cfg.min + Math.floor(Math.random()*(steps+1))*cfg.step;
+    });
+    syncControls(); rebuildCount();
+    ctx.fillStyle='#05060a'; ctx.fillRect(0,0,W,H);
+  }
+  function savePNG(){
+    const out=document.createElement('canvas'); out.width=W; out.height=H;
+    const o=out.getContext('2d'); o.drawImage(cv,0,0);
+    const g=o.createRadialGradient(W/2,H/2,Math.min(W,H)*0.30,W/2,H/2,Math.max(W,H)*0.62);
+    g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.5)');
+    o.fillStyle=g; o.fillRect(0,0,W,H);
+    const a=document.createElement('a'); a.download='ephemeral_butterfly_seed_'+seed+'.png'; a.href=out.toDataURL('image/png'); a.click();
+  }
+
+  document.getElementById('regen').addEventListener('click',regenerate);
+  document.getElementById('demo').addEventListener('click',randomDemo);
+  document.getElementById('save').addEventListener('click',savePNG);
+  window.addEventListener('resize',resize);
+
+  // ---------- 启动 ----------
+  resize();
+  seedEl.textContent=seed;
+  countEl.textContent=Math.round(N).toLocaleString();
   requestAnimationFrame(frame);
-  window.addEventListener('resize', () => { scale = Math.min(W,H) * 0.16; });
 })();
 </script>
 </body>
