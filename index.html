@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>电子蝴蝶 · EPHEMERAL BUTTERFLY</title>
+<style>
+  :root{
+    --bg:#05060a;
+    --cyan:#38f9ff;
+    --magenta:#ff3df0;
+    --green:#5dff9e;
+    --ink:#cfd8ff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--bg);}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    color:var(--ink);
+    cursor:crosshair;
+  }
+  #stage{position:fixed;inset:0;}
+  canvas{position:fixed;inset:0;display:block;}
+
+  /* 两块屏幕 */
+  .screen{
+    position:fixed;top:50%;transform:translateY(-50%);
+    width:24vw;max-width:340px;min-width:180px;height:62vh;max-height:560px;min-height:300px;
+    border:1px solid rgba(56,249,255,.35);
+    border-radius:10px;
+    background:linear-gradient(160deg, rgba(56,249,255,.05), rgba(255,61,240,.04));
+    box-shadow:0 0 26px rgba(56,249,255,.18), inset 0 0 40px rgba(56,249,255,.06);
+    overflow:hidden;
+    backdrop-filter:blur(1px);
+  }
+  .screen.left{left:4vw;}
+  .screen.right{right:4vw;}
+  .screen::before{ /* 扫描线 */
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.05) 0 1px, transparent 1px 3px);
+    mix-blend-mode:overlay;opacity:.5;
+  }
+  .screen .label{
+    position:absolute;left:12px;top:10px;font-size:11px;letter-spacing:.28em;
+    color:rgba(207,216,255,.55);text-transform:uppercase;
+  }
+  .screen .wave{position:absolute;inset:0;opacity:.5;}
+  .screen.glitch{animation:scr 240ms steps(2) 2;}
+  @keyframes scr{
+    0%{filter:none;transform:translateY(-50%) translateX(0);}
+    25%{filter:hue-rotate(40deg) saturate(1.6);transform:translateY(-50%) translateX(6px) skewX(-3deg);}
+    50%{filter:invert(.12);transform:translateY(-50%) translateX(-7px) skewX(2deg);}
+    75%{filter:hue-rotate(-30deg);transform:translateY(-50%) translateX(3px);}
+    100%{filter:none;transform:translateY(-50%) translateX(0);}
+  }
+
+  /* 标题与提示 */
+  .title{
+    position:fixed;left:50%;top:6vh;transform:translateX(-50%);text-align:center;
+    pointer-events:none;mix-blend-mode:screen;
+  }
+  .title h1{
+    font-size:clamp(15px,2.4vw,26px);font-weight:600;letter-spacing:.42em;
+    color:#eaf2ff;text-shadow:0 0 12px rgba(56,249,255,.55);
+  }
+  .title .sub{margin-top:6px;font-size:10px;letter-spacing:.45em;color:rgba(207,216,255,.4);}
+
+  .hint{
+    position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);
+    font-size:12px;letter-spacing:.22em;color:rgba(207,216,255,.55);
+    pointer-events:none;transition:opacity 1.2s ease;text-align:center;
+  }
+  .hint.hide{opacity:0;}
+  .hint .k{color:var(--cyan);}
+
+  .vignette{position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);}
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+  <canvas id="c"></canvas>
+  <div class="vignette"></div>
+
+  <div class="screen left" id="sL">
+    <div class="label">SCR_01 // 屏</div>
+    <svg class="wave" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <polyline points="0,50 10,30 20,70 30,40 40,60 50,25 60,75 70,45 80,55 90,35 100,65"
+        fill="none" stroke="rgba(56,249,255,.6)" stroke-width="0.6"/>
+      <polyline points="0,60 15,55 30,80 45,50 60,85 75,55 90,78 100,52"
+        fill="none" stroke="rgba(255,61,240,.45)" stroke-width="0.5"/>
+    </svg>
+  </div>
+  <div class="screen right" id="sR">
+    <div class="label">SCR_02 // 屏</div>
+    <svg class="wave" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <polyline points="0,55 12,35 24,72 36,42 48,62 60,28 72,77 84,46 92,58 100,38"
+        fill="none" stroke="rgba(93,255,158,.55)" stroke-width="0.6"/>
+      <polyline points="0,65 18,58 34,82 50,48 66,86 80,52 92,80 100,55"
+        fill="none" stroke="rgba(56,249,255,.4)" stroke-width="0.5"/>
+    </svg>
+  </div>
+
+  <div class="title">
+    <h1>电子蝴蝶</h1>
+    <div class="sub">EPHEMERAL · BUTTERFLY · BETWEEN · TWO · SCREENS</div>
+  </div>
+  <div class="hint" id="hint">移动光标 · <span class="k">点击</span> 触发蜕变：化茧 → 破茧 → 离子消散</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const sL = document.getElementById('sL'), sR = document.getElementById('sR');
+  const hint = document.getElementById('hint');
+
+  let W = 0, H = 0, DPR = 1;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  // 鼠标 / 触摸
+  const mouse = { x: W/2, y: H/2, has: false };
+  function setMouse(x, y){ mouse.x = x; mouse.y = y; mouse.has = true; hideHint(); }
+  window.addEventListener('mousemove', e => setMouse(e.clientX, e.clientY));
+  window.addEventListener('touchmove', e => { const t=e.touches[0]; if(t) setMouse(t.clientX,t.clientY); }, {passive:true});
+  let hintHidden = false;
+  function hideHint(){ if(!hintHidden){ hintHidden = true; hint.classList.add('hide'); } }
+  setTimeout(hideHint, 6000);
+
+  // 调色板
+  const PAL = ['#38f9ff', '#ff3df0', '#5dff9e', '#bfe9ff', '#ffffff'];
+
+  // 蝴蝶曲线基准点 (Fay's butterfly)
+  function makeButterfly(n){
+    const pts = [];
+    for(let i=0;i<n;i++){
+      const t = (i/n) * 12 * Math.PI;
+      const e = Math.exp(Math.cos(t)) - 2*Math.cos(4*t) - Math.pow(Math.sin(t/12), 5);
+      const x = Math.sin(t) * e;
+      const y = -Math.cos(t) * e;
+      pts.push({ x: x/4.2, y: y/4.2 });
+    }
+    return pts;
+  }
+  const N = 560;
+  const base = makeButterfly(N);
+
+  // 粒子
+  const P = [];
+  function rand(a,b){ return a + Math.random()*(b-a); }
+  for(let i=0;i<N;i++){
+    P.push({
+      x: rand(0,W), y: rand(0,H),
+      vx: 0, vy: 0,
+      tx: 0, ty: 0,
+      a: rand(.5,1),            // 当前 alpha
+      aT: 1,                    // 目标 alpha
+      size: rand(1.1, 2.6),
+      col: PAL[(Math.random()*PAL.length)|0],
+      flick: Math.random()*Math.PI*2,
+      seed: Math.random()
+    });
+  }
+
+  // 蝴蝶中心与状态机
+  const cx = { x: W/2, y: H/2 };
+  let scale = Math.min(W,H) * 0.16;
+  let state = 'butterfly';
+  let stateStart = performance.now();
+  let lastInteract = performance.now();
+  let flapPhase = 0;
+  let emergePop = 0; // 破茧弹出缩放
+
+  const T = {
+    cocoon: 1500,
+    emerge: 1100,
+    dissipate: 1700
+  };
+
+  let cocoonC = {x:0,y:0};
+  let cocoonTargets = null;
+
+  function assignCocoon(){
+    cocoonC.x = cx.x; cocoonC.y = cx.y;
+    const w = scale*0.5, h = scale*1.5;
+    cocoonTargets = [];
+    for(let i=0;i<N;i++){
+      const ang = Math.random()*Math.PI*2;
+      const r = Math.sqrt(Math.random());
+      // 竖向纺锤（蛹）
+      const taper = 1 - 0.45*Math.abs(Math.sin(Math.random()*Math.PI)); // 两端略收
+      const x = cocoonC.x + Math.cos(ang)*w*r*taper;
+      const y = cocoonC.y + Math.sin(ang)*h*r;
+      cocoonTargets.push({x, y});
+    }
+  }
+
+  function triggerMetamorphosis(){
+    if(state !== 'butterfly') return;
+    state = 'cocoon'; stateStart = performance.now(); lastInteract = performance.now();
+    assignCocoon();
+    for(const p of P){ p.vx=0; p.vy=0; p.aT = 1; }
+  }
+  window.addEventListener('click', triggerMetamorphosis);
+  window.addEventListener('touchstart', e=>{ triggerMetamorphosis(); }, {passive:true});
+
+  function glitchScreenAt(x){
+    const rL = sL.getBoundingClientRect(), rR = sR.getBoundingClientRect();
+    if(x > rL.left && x < rL.right){ sL.classList.remove('glitch'); void sL.offsetWidth; sL.classList.add('glitch'); }
+    if(x > rR.left && x < rR.right){ sR.classList.remove('glitch'); void sR.offsetWidth; sR.classList.add('glitch'); }
+  }
+
+  let prevCx = W/2;
+  let last = performance.now();
+
+  function frame(now){
+    const dt = Math.min(40, now - last); last = now;
+    const time = now/1000;
+
+    // 状态推进
+    const sd = now - stateStart;
+    if(state === 'cocoon' && sd > T.cocoon){
+      state = 'emerge'; stateStart = now; emergePop = 1.6;
+      for(const p of P){ p.aT = 1; p.size = rand(1.3,3.0); }
+    } else if(state === 'emerge' && sd > T.emerge){
+      state = 'dissipate'; stateStart = now;
+      for(const p of P){
+        const ang = Math.atan2(p.y - cx.y, p.x - cx.x) + rand(-.5,.5);
+        const sp = rand(1.2, 4.5) * (scale/120);
+        p.vx = Math.cos(ang)*sp + rand(-.4,.4);
+        p.vy = Math.sin(ang)*sp - rand(.6,1.8); // 略向上飘散（离子）
+        p.aT = 0;
+      }
+    } else if(state === 'dissipate'){
+      // 自然散尽后重组
+      let sum=0; for(const p of P) sum += p.a;
+      if(sum/N < 0.06){ state = 'butterfly'; stateStart = now; emergePop = 1.3;
+        for(const p of P){ p.x = cx.x + rand(-20,20); p.y = cx.y + rand(-20,20); p.vx=0; p.vy=0; p.a=0; p.aT=1; }
+      }
+    }
+    // 空闲自发蜕变（让作品自己"活"）
+    if(state === 'butterfly' && now - lastInteract > 9000 && now - stateStart > 3500){
+      triggerMetamorphosis();
+    }
+
+    // 蝴蝶中心：跟随光标，限制在两屏之间的空间
+    const rL = sL.getBoundingClientRect(), rR = sR.getBoundingClientRect();
+    const minX = rL.right + 10, maxX = rR.left - 10;
+    let targetX = mouse.has ? mouse.x : cx.x + Math.sin(time*0.6)*40;
+    let targetY = mouse.has ? mouse.y : H/2 + Math.cos(time*0.5)*30;
+    targetX = Math.max(minX, Math.min(maxX, targetX));
+    targetY = Math.max(H*0.18, Math.min(H*0.86, targetY));
+    if(state === 'dissipate' || state === 'reform'){ /* 消散/重组时不强制跟随 */ }
+    else { cx.x += (targetX - cx.x) * 0.06; cx.y += (targetY - cx.y) * 0.06; }
+
+    if(Math.abs(cx.x - prevCx) > 1.5) glitchScreenAt(cx.x);
+    prevCx = cx.x;
+
+    // 翅膀拍动
+    flapPhase += dt * 0.012;
+    const flap = 0.55 + 0.45*Math.sin(flapPhase*6);
+    emergePop += (1 - emergePop) * 0.08;
+    const curScale = scale * emergePop;
+
+    // 拖尾：半透明覆盖
+    ctx.fillStyle = 'rgba(5,6,10,0.22)';
+    ctx.fillRect(0,0,W,H);
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    for(let i=0;i<N;i++){
+      const p = P[i];
+
+      if(state === 'butterfly' || state === 'emerge'){
+        const b = base[i];
+        const fx = state === 'emerge' ? b.x : b.x * flap;
+        p.tx = cx.x + fx * curScale;
+        p.ty = cx.y + b.y * curScale;
+        p.x += (p.tx - p.x) * 0.18;
+        p.y += (p.ty - p.y) * 0.18;
+      } else if(state === 'cocoon'){
+        const c = cocoonTargets[i];
+        const pulse = 1 + 0.05*Math.sin(time*5 + i);
+        p.tx = c.x; p.ty = c.y + (c.y - cocoonC.y) * (pulse - 1);
+        p.x += (p.tx - p.x) * 0.16;
+        p.y += (p.ty - p.y) * 0.16;
+      } else if(state === 'dissipate'){
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.04;            // 轻微重力+上浮抵消 → 漂浮感
+        p.vx *= 0.985; p.vy *= 0.99;
+      }
+
+      // alpha 趋近
+      p.a += (p.aT - p.a) * 0.06;
+      p.flick += 0.2;
+      const tw = 0.75 + 0.25*Math.sin(p.flick);
+      let alpha = p.a * tw;
+      if(state === 'dissipate') alpha *= Math.max(0, p.a);
+
+      const sz = p.size * (state === 'dissipate' ? (1 + (1-p.a)*1.4) : 1);
+
+      ctx.beginPath();
+      ctx.fillStyle = p.col;
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      ctx.shadowColor = p.col;
+      ctx.shadowBlur = state === 'dissipate' ? 10 : 7;
+      ctx.arc(p.x, p.y, sz, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // 屏幕 RGB 撕裂偶尔自发
+  setInterval(()=>{
+    const r = Math.random();
+    if(r < 0.5) sL.classList.add('glitch'); else sR.classList.add('glitch');
+    setTimeout(()=>{ sL.classList.remove('glitch'); sR.classList.remove('glitch'); }, 260);
+  }, 4200);
+
+  // 自适应 scale
+  window.addEventListener('resize', ()=>{ scale = Math.min(W,H)*0.16; });
+})();
+</script>
+</body>
+</html>
